@@ -1,0 +1,28 @@
+import type { Category } from "./lunch";
+
+export const MENUS: { name: string; category: Category }[] = [
+  { name: "김치찌개", category: "한식" },
+  { name: "된장찌개", category: "한식" },
+  { name: "순두부찌개", category: "한식" },
+  { name: "제육볶음", category: "한식" },
+  { name: "비빔밥", category: "한식" },
+  { name: "국밥", category: "한식" },
+  { name: "냉면", category: "한식" },
+  { name: "칼국수", category: "한식" },
+  { name: "짜장면", category: "중식" },
+  { name: "짬뽕", category: "중식" },
+  { name: "볶음밥", category: "중식" },
+  { name: "마라탕", category: "중식" },
+  { name: "돈까스", category: "일식" },
+  { name: "초밥", category: "일식" },
+  { name: "우동", category: "일식" },
+  { name: "라멘", category: "일식" },
+  { name: "파스타", category: "양식" },
+  { name: "피자", category: "양식" },
+  { name: "햄버거", category: "양식" },
+  { name: "샌드위치", category: "양식" },
+  { name: "김밥", category: "분식" },
+  { name: "떡볶이", category: "분식" },
+  { name: "쌀국수", category: "기타" },
+  { name: "샐러드", category: "기타" },
+];

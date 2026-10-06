@@ -1,41 +1,23 @@
-This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
+<!-- BEGIN:nextjs-agent-rules -->
 
-## Expo has changed — do not trust your training data
+# This is NOT the Next.js you know
 
-Expo ships breaking changes every SDK release. APIs you remember are likely renamed, moved, or removed. Before writing any code that touches an Expo, EAS, or React Native API:
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
 
-1. Read the major version of the `expo` package in `package.json`.
-2. Fetch the matching versioned docs: `https://docs.expo.dev/versions/v<major>.0.0/`
-3. For anything else, fetch https://docs.expo.dev/llms.txt — an index of all Expo docs with corrections to common LLM misconceptions. Follow its links to the specific page you need; never answer from memory.
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
-## Commands
+<!-- END:nextjs-agent-rules -->
 
-Use `bunx` instead of `npx` if the project uses bun (`bun.lock` present).
+# 문구 작성 규칙
 
-```bash
-npx expo install <package>  # ALWAYS use instead of npm/yarn/pnpm/bun add — resolves SDK-compatible versions
-npx expo start              # start the dev server
-npx expo lint               # lint
-npx tsc --noEmit            # typecheck
-npx expo-doctor             # diagnose dependency and config issues
-npx expo install --fix      # fix incompatible package versions
-```
+- UI, 문서, 답변에는 기능과 사용에 필요한 문장만 간결하게 작성한다.
+- 불필요한 미사여구, 홍보성 문구, 감성 문구, 장식용 영문, 반복 안내는 작성하지 않는다.
+- 버튼·제목은 동작과 대상을 명확히 쓰고, 설명은 사용자의 판단이나 조작에 필요한 경우에만 추가한다.
 
-Run lint and typecheck before declaring any task done.
+# 디자인 기준
 
-## Navigation & Routing
-
-- Use **Expo Router** for all navigation. Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators. Keep non-route code (components, hooks, utils) outside `src/app/`.
-- Import `Link`, `router`, and `useLocalSearchParams` from `expo-router`.
-- Docs: https://docs.expo.dev/router/introduction.md
-
-## Building with EAS
-
-Use EAS to build, sign, and submit the app in the cloud (`eas build`, `eas submit`) and to ship over-the-air updates (`eas update`) — no local Xcode or Android Studio required. Run EAS CLI as `bunx eas-cli <command>` in Bun projects, or `npx eas-cli@latest <command>` otherwise; substitute that for bare `eas` in docs examples.
-Docs: https://docs.expo.dev/eas/index.md
-
-## Rules
-
-- If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.
-- Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: `npx expo run:ios|android` locally, or `eas build --profile development`.
-- Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md
+- 앞으로 모든 작업은 시작 전에 루트의 `DESIGN.md`를 읽고 해당 기준을 참고한다.
+- UI를 추가하거나 수정할 때 색상, 서체, 크기, 간격, 형태, 반응형 구성을 `DESIGN.md`에 맞춘다.
+- 화면 용도와 접근성에 맞게 크기를 조정하되, 임의의 디자인 체계를 추가하지 않는다.
+- 디자인을 적용할 때도 위 문구 작성 규칙을 유지한다.
+- 모바일 사용을 우선한다. 320~430px에서 핵심 조작과 결과를 확인하고, 터치 영역·입력 글자 크기·가상 키보드·안전 영역을 고려한다. 데스크톱도 함께 확인한다.
