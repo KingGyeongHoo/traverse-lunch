@@ -14,6 +14,8 @@ import {
   LunchError,
   parseRestaurant,
   matchesDistance,
+  duplicateRestaurant,
+  DUPLICATE_RESTAURANT_MESSAGE,
   type DistanceFilter,
   type Restaurant,
 } from "./lunch";
@@ -100,10 +102,11 @@ export async function snapshot() {
 
 export async function addRestaurant(value: unknown) {
   const input = parseRestaurant(value);
-  return changeStore((items) => [
-    ...items,
-    { ...input, id: randomUUID(), excludedDate: null },
-  ]);
+  return changeStore((items) => {
+    if (duplicateRestaurant(items, input))
+      throw new LunchError(DUPLICATE_RESTAURANT_MESSAGE, 409);
+    return [...items, { ...input, id: randomUUID(), excludedDate: null }];
+  });
 }
 
 export async function updateRestaurant(id: string, value: unknown) {
@@ -123,6 +126,15 @@ export async function updateRestaurant(id: string, value: unknown) {
         "이미 삭제된 식당이에요. 목록을 새로고침해 주세요.",
         404,
       );
+    if (
+      input &&
+      duplicateRestaurant(
+        items,
+        { ...items.find((item) => item.id === id)!, ...input },
+        id,
+      )
+    )
+      throw new LunchError(DUPLICATE_RESTAURANT_MESSAGE, 409);
     return items.map((item) =>
       item.id !== id
         ? item
@@ -135,7 +147,17 @@ export async function updateRestaurant(id: string, value: unknown) {
               ...item,
               ...input,
               distance:
-                body.distance === undefined ? item.distance : input!.distance,
+                input!.latitude != null
+                  ? input!.distance
+                  : body.distance === undefined
+                    ? item.distance
+                    : input!.distance,
+              distanceMeters:
+                input!.address === "" && item.address
+                  ? null
+                  : Object.hasOwn(input!, "distanceMeters")
+                    ? input!.distanceMeters
+                    : item.distanceMeters,
             },
     );
   });
@@ -158,7 +180,7 @@ export async function pickRestaurant(distance: DistanceFilter = "all") {
   );
   if (!candidates.length)
     throw new LunchError(
-      distance === "all" || distance === "멂"
+      distance === "all" || distance === "매우 멂"
         ? "오늘 뽑을 수 있는 식당이 없어요. 휴무와 제외 설정을 확인해 주세요."
         : `‘${distance}’까지 오늘 뽑을 수 있는 식당이 없어요. 거리를 늘리거나 휴무·제외 설정을 확인해 주세요.`,
       409,

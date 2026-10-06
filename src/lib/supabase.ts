@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { parseSnapshot } from "./snapshot";
+import { DUPLICATE_RESTAURANT_MESSAGE } from "./lunch";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -58,6 +59,12 @@ export async function rpc(name: string, args: Record<string, unknown>) {
       .rpc(name, args)
       .abortSignal(controller.signal);
     if (error) {
+      if (
+        error.code === "23505" &&
+        (error.message.includes("lunch_restaurants_team_name_unique") ||
+          error.message.includes("lunch_restaurants_team_address_name_unique"))
+      )
+        throw new Error(DUPLICATE_RESTAURANT_MESSAGE);
       if (error.code === "P0001") throw new Error(error.message);
       if (
         error.code === "23514" ||

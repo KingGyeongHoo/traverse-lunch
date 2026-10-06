@@ -77,16 +77,71 @@ test(
         await new Promise((resolve) => setTimeout(resolve, 150));
       }
       assert.ok(ready, logs);
-      await api("/places", "POST", { lat: 37.5, lng: 127, radius: 999 }, 400);
-      await api("/places/locations", "POST", { query: " " }, 400);
-      const invalidPlaces = await fetch(`${base}/api/places`, {
-        method: "POST",
-        body: "{",
-      });
-      assert.equal(invalidPlaces.status, 400);
-      assert.equal(invalidPlaces.headers.get("cache-control"), "no-store");
       const empty = await api("/restaurants");
       assert.deepEqual(empty.restaurants, []);
+      const located = await api(
+        "/restaurants",
+        "POST",
+        {
+          ...input("주소 등록 검증"),
+          address: "서울 영등포구 양평로 12",
+          latitude: 37.5326909883438,
+          longitude: 126.90489166462,
+          distance: "멂",
+          distanceMeters: 9999,
+        },
+        201,
+      );
+      const locatedId = located.restaurants[0].id;
+      assert.equal(located.restaurants[0].distanceMeters, 0);
+      assert.equal(located.restaurants[0].distance, "가까움");
+      const sameAddress = {
+        ...input("주소등록 검증"),
+        address: "서울 영등포구 양평로 12",
+        latitude: 37.5326909883438,
+        longitude: 126.90489166462,
+      };
+      await api("/restaurants", "POST", sameAddress, 409);
+      const otherAddress = await api(
+        "/restaurants",
+        "POST",
+        {
+          ...sameAddress,
+          address: "서울 영등포구 양평로 8",
+          latitude: 37.5325527443156,
+          longitude: 126.90507772707741,
+        },
+        201,
+      );
+      const otherId = otherAddress.restaurants.find(
+        (item) => item.address === "서울 영등포구 양평로 8",
+      ).id;
+      await api(`/restaurants/${otherId}`, "PATCH", sameAddress, 409);
+      await api(`/restaurants/${otherId}`, "DELETE");
+      await api(`/restaurants/${locatedId}`, "PATCH", input("이름만 수정"));
+      let locationReload = (await api("/restaurants")).restaurants[0];
+      assert.equal(locationReload.address, "서울 영등포구 양평로 12");
+      assert.equal(locationReload.distanceMeters, 0);
+      await api(`/restaurants/${locatedId}`, "PATCH", {
+        ...input("주소 이동"),
+        address: "좌표 변경 검증",
+        latitude: 37.5426909883438,
+        longitude: 126.90489166462,
+      });
+      locationReload = (await api("/restaurants")).restaurants[0];
+      assert.equal(locationReload.distanceMeters, 1112);
+      assert.equal(locationReload.distance, "매우 멂");
+      await api(`/restaurants/${locatedId}`, "PATCH", {
+        ...input("주소 삭제"),
+        address: "",
+        latitude: null,
+        longitude: null,
+        distance: null,
+      });
+      locationReload = (await api("/restaurants")).restaurants[0];
+      assert.equal(locationReload.distanceMeters, null);
+      assert.equal(locationReload.address, "");
+      await api(`/restaurants/${locatedId}`, "DELETE");
       await api("/pick", "POST", undefined, 409);
       await api("/restaurants", "POST", input(" "), 400);
       await api("/restaurants", "POST", input("잘못된 요일", [7]), 400);
@@ -115,6 +170,40 @@ test(
       );
 
       const first = data.restaurants[0];
+      const duplicate = await api(
+        "/restaurants",
+        "POST",
+        input(first.name.replaceAll(" ", "")),
+        409,
+      );
+      assert.match(duplicate.error, /같은 주소와 이름/);
+      await api(
+        `/restaurants/${data.restaurants[1].id}`,
+        "PATCH",
+        input(first.name),
+        409,
+      );
+      await api(`/restaurants/${first.id}`, "PATCH", input(first.name));
+      const concurrentDuplicates = await Promise.all(
+        Array.from({ length: 6 }, () =>
+          fetch(`${base}/api/restaurants`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(input("Concurrent 중복")),
+          }),
+        ),
+      );
+      assert.deepEqual(
+        concurrentDuplicates.map((response) => response.status).sort(),
+        [201, 409, 409, 409, 409, 409],
+      );
+      const afterDuplicates = await api("/restaurants");
+      const createdDuplicate = afterDuplicates.restaurants.find(
+        (item) => item.name === "Concurrent 중복",
+      );
+      assert.equal(afterDuplicates.restaurants.length, 13);
+      await api("/restaurants", "POST", input(" concurrent중복 "), 409);
+      await api(`/restaurants/${createdDuplicate.id}`, "DELETE");
       await api(
         `/restaurants/${first.id}`,
         "PATCH",
@@ -180,12 +269,12 @@ test(
       assert.equal((await api("/restaurants")).restaurants[0].distance, null);
       assert.equal((await api("/pick", "POST")).picked.id, "legacy");
       assert.equal(
-        (await api("/pick", "POST", { distance: "멂" })).picked.id,
+        (await api("/pick", "POST", { distance: "매우 멂" })).picked.id,
         "legacy",
       );
       await api("/pick", "POST", { distance: "가까움" }, 409);
 
-      for (const distance of ["가까움", "중간", "멂"]) {
+      for (const distance of ["가까움", "중간", "멂", "매우 멂"]) {
         await api(
           "/restaurants",
           "POST",
@@ -194,7 +283,7 @@ test(
         );
       }
       const byDistance = (await api("/restaurants")).restaurants;
-      for (const distance of ["가까움", "중간", "멂"]) {
+      for (const distance of ["가까움", "중간", "멂", "매우 멂"]) {
         const draws = await Promise.all(
           Array.from({ length: 8 }, () => api("/pick", "POST", { distance })),
         );
@@ -203,7 +292,9 @@ test(
             ? ["가까움"]
             : distance === "중간"
               ? ["가까움", "중간"]
-              : ["가까움", "중간", "멂", null];
+              : distance === "멂"
+                ? ["가까움", "중간", "멂"]
+                : ["가까움", "중간", "멂", "매우 멂", null];
         assert.ok(
           draws.every((draw) => allowed.includes(draw.picked.distance)),
         );

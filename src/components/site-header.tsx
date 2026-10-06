@@ -3,7 +3,7 @@ import Link from "next/link";
 export default function SiteHeader({
   current,
 }: {
-  current?: "restaurants" | "menus" | "nearby";
+  current?: "restaurants" | "menus";
 }) {
   return (
     <header className="header">
@@ -17,12 +17,6 @@ export default function SiteHeader({
         점심시간
       </Link>
       <nav className="site-nav" aria-label="주 메뉴">
-        <Link
-          href="/nearby"
-          aria-current={current === "nearby" ? "page" : undefined}
-        >
-          주변 식당
-        </Link>
         <Link
           href="/restaurants"
           aria-current={current === "restaurants" ? "page" : undefined}

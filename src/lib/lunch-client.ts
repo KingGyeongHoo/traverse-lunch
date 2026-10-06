@@ -4,6 +4,7 @@ import type {
   RestaurantInput,
   Distance,
 } from "./lunch";
+import type { RestaurantLocation } from "./restaurant-location";
 import {
   configured,
   ensureSession,
@@ -45,6 +46,9 @@ async function mutate(action: Action, payload: Record<string, unknown>) {
 }
 
 export const lunchClient = {
+  resolveAddress(address: string): Promise<RestaurantLocation> {
+    return request("/api/address", "POST", { address });
+  },
   async load(): Promise<LunchSnapshot> {
     return configured
       ? loadSnapshot(await companyId())

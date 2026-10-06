@@ -12,12 +12,15 @@ import SiteHeader from "./site-header";
 import SelectionIcon from "./selection-icon";
 import { lunchClient } from "@/lib/lunch-client";
 import officeRestaurantDistances from "@/data/office-restaurant-distances.json";
+import { OFFICE, type RestaurantLocation } from "@/lib/restaurant-location";
 import {
   availability,
   CATEGORIES,
   DAYS,
   DISTANCES,
   matchesDistance,
+  duplicateRestaurant,
+  DUPLICATE_RESTAURANT_MESSAGE,
   type Category,
   type Distance,
   type LunchSnapshot,
@@ -28,6 +31,7 @@ import {
 const WEEK = [1, 2, 3, 4, 5, 6, 0];
 
 function distanceMetersOf(item: Restaurant): number | null {
+  if (item.distanceMeters !== undefined) return item.distanceMeters;
   // Imported restaurants: meters from 양평로 12, independent of editable notes.
   const savedDistance = (officeRestaurantDistances as Record<string, number>)[
     item.id
@@ -111,7 +115,7 @@ export default function LunchApp() {
   const [tick, setTick] = useState(0);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
-  const [distanceFilter, setDistanceFilter] = useState<Distance>("멂");
+  const [distanceFilter, setDistanceFilter] = useState<Distance>("매우 멂");
   const active = useRef(false);
   const sequence = useRef(0);
 
@@ -330,18 +334,18 @@ export default function LunchApp() {
                 className="distance-range"
                 type="range"
                 min={0}
-                max={2}
+                max={DISTANCES.length - 1}
                 step={1}
                 value={DISTANCES.indexOf(distanceFilter)}
                 aria-label="추천 최대 거리"
                 aria-valuetext={
-                  distanceFilter === "멂"
-                    ? "멂, 모든 거리 포함"
+                  distanceFilter === "매우 멂"
+                    ? "매우 멂, 모든 거리 포함"
                     : `${distanceFilter}까지 포함`
                 }
                 style={
                   {
-                    "--range-progress": `${DISTANCES.indexOf(distanceFilter) * 50}%`,
+                    "--range-progress": `${(DISTANCES.indexOf(distanceFilter) / (DISTANCES.length - 1)) * 100}%`,
                   } as CSSProperties
                 }
                 onChange={(event) => {
@@ -370,7 +374,9 @@ export default function LunchApp() {
                   ? "가까운 식당만"
                   : distanceFilter === "중간"
                     ? "가까움 + 중간까지"
-                    : "모든 거리 포함"}
+                    : distanceFilter === "멂"
+                      ? "멂까지 · 750m 이하"
+                      : "모든 거리 포함"}
                 <span>오늘의 후보 {candidates.length}곳</span>
               </p>
             </fieldset>
@@ -393,7 +399,7 @@ export default function LunchApp() {
                 : !items.length
                   ? "식당을 추가해 주세요"
                   : !candidates.length
-                    ? distanceFilter === "멂"
+                    ? distanceFilter === "매우 멂"
                       ? "오늘 가능한 식당이 없어요. 휴무 설정을 확인해 주세요"
                       : `‘${distanceFilter}’까지 후보가 없어요. 거리를 늘리거나 식당의 거리를 설정해 주세요`
                     : "정기휴무 식당은 추첨에서 제외"}
@@ -555,6 +561,7 @@ export default function LunchApp() {
       )}
       {editor !== null && (
         <RestaurantEditor
+          restaurants={items}
           item={editor === "new" ? null : editor}
           busy={busy}
           onClose={() => setEditor(null)}
@@ -566,33 +573,54 @@ export default function LunchApp() {
   );
 }
 
-export function RestaurantEditor({
+function RestaurantEditor({
+  restaurants,
   item,
-  initialInput,
-  busy,
+  busy: saving,
   onClose,
   onSave,
   onDelete,
 }: {
+  restaurants: Restaurant[];
   item: Restaurant | null;
-  initialInput?: RestaurantInput;
   busy: boolean;
   onClose: () => void;
   onSave: (value: RestaurantInput) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const [name, setName] = useState(item?.name || initialInput?.name || "");
-  const [category, setCategory] = useState<Category>(
-    item?.category || initialInput?.category || "한식",
-  );
+  const [name, setName] = useState(item?.name || "");
+  const [category, setCategory] = useState<Category>(item?.category || "한식");
   const [distance, setDistance] = useState<Distance | null>(
-    item?.distance ?? initialInput?.distance ?? null,
+    item?.distance ?? null,
   );
-  const [note, setNote] = useState(item?.note || initialInput?.note || "");
-  const [days, setDays] = useState<number[]>(
-    item?.closedDays || initialInput?.closedDays || [],
+  const [address, setAddress] = useState(item?.address || "");
+  const [location, setLocation] = useState<RestaurantLocation | null>(
+    item?.address &&
+      item.latitude != null &&
+      item.longitude != null &&
+      item.distanceMeters != null &&
+      item.distance
+      ? {
+          address: item.address,
+          latitude: item.latitude,
+          longitude: item.longitude,
+          distanceMeters: item.distanceMeters,
+          distance: item.distance,
+        }
+      : null,
   );
+  const [locating, setLocating] = useState(false);
+  const [addressError, setAddressError] = useState("");
+  const duplicate = duplicateRestaurant(
+    restaurants,
+    { name, address: location?.address || address },
+    item?.id,
+  );
+  const [submitting, setSubmitting] = useState(false);
+  const busy = saving || locating || submitting;
+  const [note, setNote] = useState(item?.note || "");
+  const [days, setDays] = useState<number[]>(item?.closedDays || []);
   const [error, setError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   useEffect(() => {
@@ -618,13 +646,58 @@ export function RestaurantEditor({
     };
   }, []);
 
+  async function locate() {
+    if (location && location.address === address.trim()) return location;
+    setLocating(true);
+    setError("");
+    setAddressError("");
+    try {
+      const next = await lunchClient.resolveAddress(address.trim());
+      setAddress(next.address);
+      setLocation(next);
+      setDistance(next.distance);
+      return next;
+    } catch (error) {
+      setAddressError(messageOf(error));
+      throw error;
+    } finally {
+      setLocating(false);
+    }
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (busy) return;
     setError("");
+    setSubmitting(true);
     try {
-      await onSave({ name, category, distance, note, closedDays: days });
+      if (!item && !address.trim())
+        throw new Error("식당 주소를 입력해 주세요.");
+      const verified = address.trim() ? await locate().catch(() => null) : null;
+      if (address.trim() && !verified) return;
+      if (
+        duplicateRestaurant(
+          restaurants,
+          { name, address: verified?.address || "" },
+          item?.id,
+        )
+      )
+        throw new Error(DUPLICATE_RESTAURANT_MESSAGE);
+      await onSave({
+        name,
+        category,
+        note,
+        closedDays: days,
+        distance: verified?.distance ?? distance,
+        address: verified?.address ?? "",
+        latitude: verified?.latitude ?? null,
+        longitude: verified?.longitude ?? null,
+        ...(verified ? { distanceMeters: verified.distanceMeters } : {}),
+      });
     } catch (error) {
       setError(messageOf(error));
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -664,8 +737,15 @@ export function RestaurantEditor({
               maxLength={50}
               placeholder="예: 회사 앞 국밥집, 돈까스"
               value={name}
+              aria-invalid={!!duplicate}
+              aria-describedby={duplicate ? "duplicate-name-error" : undefined}
               onChange={(event) => setName(event.target.value)}
             />
+            {duplicate && (
+              <p id="duplicate-name-error" className="form-error" role="alert">
+                {DUPLICATE_RESTAURANT_MESSAGE}
+              </p>
+            )}
             <label className="field-label" htmlFor="restaurant-category">
               음식 종류
             </label>
@@ -678,11 +758,60 @@ export function RestaurantEditor({
                 <option key={value}>{value}</option>
               ))}
             </select>
+            <label className="field-label" htmlFor="restaurant-address">
+              식당 주소 {!item && <span>*</span>}
+            </label>
+            <div className="address-entry">
+              <input
+                id="restaurant-address"
+                required={!item}
+                maxLength={200}
+                placeholder="예: 서울 영등포구 양평로 12"
+                autoComplete="street-address"
+                value={address}
+                aria-invalid={!!addressError}
+                aria-describedby={addressError ? "address-error" : undefined}
+                onChange={(event) => {
+                  setAddress(event.target.value);
+                  setLocation(null);
+                  setDistance(
+                    !event.target.value.trim() && !item?.address
+                      ? (item?.distance ?? null)
+                      : null,
+                  );
+                  setError("");
+                  setAddressError("");
+                }}
+              />
+              <button
+                type="button"
+                className="secondary"
+                disabled={busy || !address.trim()}
+                onClick={() => void locate().catch(() => {})}
+              >
+                {locating ? "확인 중…" : "주소 확인"}
+              </button>
+            </div>
+            {addressError && (
+              <p id="address-error" className="form-error" role="alert">
+                {addressError}
+              </p>
+            )}
+            <p className="field-help" aria-live="polite">
+              {location
+                ? `${location.distance} (${location.distanceMeters.toLocaleString("ko-KR")}m) · 직선거리`
+                : `${OFFICE.address} 기준 · 저장 시 자동 계산`}
+            </p>
             <label className="field-label" htmlFor="restaurant-distance">
-              거리 <small>회사에서 얼마나 걸리는지 팀 기준으로 정해요</small>
+              거리
             </label>
             <select
               id="restaurant-distance"
+              disabled={
+                !item ||
+                !!address.trim() ||
+                (!item.address && item.distanceMeters != null)
+              }
               value={distance ?? ""}
               onChange={(event) =>
                 setDistance(
@@ -698,7 +827,11 @@ export function RestaurantEditor({
               ))}
             </select>
             <p className="field-help">
-              미설정 식당은 슬라이더를 ‘멂’으로 두면 포함돼요.
+              {!item || address.trim()
+                ? "가까움 ≤250m · 중간 ≤500m · 멂 ≤750m · 매우 멂 >750m"
+                : item.distanceMeters != null && !item.address
+                  ? `회사 기준 직선거리 ${item.distanceMeters.toLocaleString("ko-KR")}m`
+                  : "주소가 없는 기존 식당은 거리를 직접 선택할 수 있습니다."}
             </p>
             <span className="field-label" id="closed-label">
               정기휴무 <small>여러 요일을 선택할 수 있어요</small>
@@ -806,7 +939,7 @@ export function RestaurantEditor({
             <button
               className="primary"
               type="submit"
-              disabled={busy || !name.trim()}
+              disabled={busy || !name.trim() || !!duplicate}
             >
               {busy ? "저장 중…" : "저장하기"}
             </button>

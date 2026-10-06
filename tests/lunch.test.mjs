@@ -7,7 +7,27 @@ import {
   matchesDistance,
   parsePickDistance,
   DISTANCES,
+  duplicateRestaurant,
+  restaurantNameKey,
 } from "../src/lib/lunch.ts";
+
+test("duplicates require both address and normalized name and allow self edits", () => {
+  const items = [
+    { id: "one", name: "ABC 국밥", address: "서울 영등포구 양평로 12" },
+  ];
+  const input = { name: "abc국밥", address: "서울 영등포구 양평로 12" };
+  assert.equal(restaurantNameKey(" A\tB\nC\u00a0국\u3000밥 "), "abc국밥");
+  assert.equal(duplicateRestaurant(items, input)?.id, "one");
+  assert.equal(duplicateRestaurant(items, input, "one"), undefined);
+  assert.equal(
+    duplicateRestaurant(items, { ...input, name: "다른 국밥" }),
+    undefined,
+  );
+  assert.equal(
+    duplicateRestaurant(items, { ...input, address: "서울 영등포구 양평로 8" }),
+    undefined,
+  );
+});
 
 test("Korean midnight changes both the date and weekday", () => {
   assert.deepEqual(koreaToday(new Date("2026-09-14T14:59:59Z")), {
@@ -68,7 +88,7 @@ test("restaurant validation rejects malformed fields and normalizes input", () =
   }
 });
 
-test("distance slider sets a cumulative maximum and far includes legacy restaurants", () => {
+test("distance slider sets a cumulative maximum and very far includes legacy restaurants", () => {
   for (const distance of DISTANCES) {
     const input = {
       name: "식당",
@@ -89,11 +109,22 @@ test("distance slider sets a cumulative maximum and far includes legacy restaura
     }
     assert.equal(
       matchesDistance({ distance: null }, distance),
-      distance === "멂",
+      distance === "매우 멂",
     );
-    assert.equal(matchesDistance({}, distance), distance === "멂");
+    assert.equal(matchesDistance({}, distance), distance === "매우 멂");
   }
   assert.equal(matchesDistance({ distance: null }, "all"), true);
+  assert.equal(
+    parseRestaurant({
+      name: "기존 식당",
+      category: "한식",
+      note: "",
+      closedDays: [],
+      distance: "중간",
+      distanceMeters: 751,
+    }).distance,
+    "매우 멂",
+  );
   assert.equal(parsePickDistance({}), "all");
   assert.equal(parsePickDistance({ distance: "all" }), "all");
   for (const value of [
