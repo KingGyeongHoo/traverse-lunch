@@ -18,7 +18,7 @@ import {
   DUPLICATE_RESTAURANT_MESSAGE,
   type DistanceFilter,
   type Restaurant,
-} from "./lunch";
+} from "./lunch.ts";
 
 // Route Handlers only. Requires a persistent local filesystem.
 const file = resolve(

@@ -12,6 +12,7 @@ import SiteHeader from "./site-header";
 import SelectionIcon from "./selection-icon";
 import { lunchClient } from "@/lib/lunch-client";
 import officeRestaurantDistances from "@/data/office-restaurant-distances.json";
+import type { Ratings } from "@/lib/ratings";
 import { OFFICE, type RestaurantLocation } from "@/lib/restaurant-location";
 import {
   availability,
@@ -105,6 +106,11 @@ const messageOf = (error: unknown) =>
     : "연결이 지연되고 있어요. 잠시 후 다시 시도해 주세요.";
 
 export default function LunchApp() {
+  const [ratings, setRatings] = useState<Ratings | null>(null);
+  const [ratingError, setRatingError] = useState("");
+  const [ratingBusy, setRatingBusy] = useState(false);
+  const ratingActive = useRef(false);
+  const ratingSequence = useRef(0);
   const [data, setData] = useState<LunchSnapshot | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -162,6 +168,50 @@ export default function LunchApp() {
       requests.current++;
     };
   }, [refresh]);
+
+  const refreshRatings = useCallback(() => {
+    if (ratingActive.current) return;
+    const seq = ++ratingSequence.current;
+    void lunchClient
+      .ratings()
+      .then((next) => {
+        if (seq !== ratingSequence.current) return;
+        setRatings(next);
+        setRatingError("");
+      })
+      .catch(() => {
+        if (seq === ratingSequence.current)
+          setRatingError("별점 정보를 불러오지 못했어요.");
+      });
+  }, []);
+
+  useEffect(() => {
+    const requests = ratingSequence;
+    refreshRatings();
+    const interval = setInterval(refreshRatings, 30000);
+    window.addEventListener("focus", refreshRatings);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", refreshRatings);
+      requests.current++;
+    };
+  }, [refreshRatings]);
+
+  async function rate(id: string, score: number) {
+    if (ratingActive.current) return;
+    ratingActive.current = true;
+    ratingSequence.current++;
+    setRatingBusy(true);
+    setRatingError("");
+    try {
+      setRatings(await lunchClient.setRating(id, score));
+    } catch {
+      setRatingError("별점을 저장하지 못했어요. 다시 시도해 주세요.");
+    } finally {
+      ratingActive.current = false;
+      setRatingBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (!notice) return;
@@ -278,6 +328,14 @@ export default function LunchApp() {
           <div className="error-banner" role="alert">
             <span>{error}</span>
             <button onClick={() => void refresh()} disabled={disabled}>
+              다시 불러오기
+            </button>
+          </div>
+        )}
+        {ratingError && (
+          <div className="error-banner" role="alert">
+            <span>{ratingError}</span>
+            <button onClick={refreshRatings} disabled={ratingBusy}>
               다시 불러오기
             </button>
           </div>
@@ -529,6 +587,15 @@ export default function LunchApp() {
                       </span>
                     </div>
                     <h3>{item.name}</h3>
+                    <div
+                      className="rating-average"
+                      aria-label={`평균 별점 ${ratings ? (ratings[item.id]?.average ?? 0).toFixed(1) : "확인 중"}`}
+                    >
+                      <span aria-hidden="true">★</span>{" "}
+                      {ratings
+                        ? (ratings[item.id]?.average ?? 0).toFixed(1)
+                        : "—"}
+                    </div>
                     <div className="closed-days">
                       <Icon name="clock" size={14} />
                       <span>
@@ -540,6 +607,37 @@ export default function LunchApp() {
                               .join("·")}요일 정기휴무`
                           : "등록된 정기휴무 없음"}
                       </span>
+                    </div>
+                    <div
+                      className="preference-field"
+                      role="group"
+                      aria-label={`${item.name} 내 별점 ${ratings?.[item.id]?.mine ?? 0}점`}
+                    >
+                      <span>내 별점</span>
+                      <div className="rating-stars">
+                        {[1, 2, 3, 4, 5].map((score) => (
+                          <button
+                            type="button"
+                            key={score}
+                            aria-label={`${item.name} ${score}점${ratings?.[item.id]?.mine === score ? " 선택됨, 다시 누르면 취소" : ""}`}
+                            aria-pressed={ratings?.[item.id]?.mine === score}
+                            disabled={!ratings || ratingBusy}
+                            onClick={() =>
+                              void rate(
+                                item.id,
+                                ratings?.[item.id]?.mine === score ? 0 : score,
+                              )
+                            }
+                            className={
+                              score <= (ratings?.[item.id]?.mine ?? 0)
+                                ? "selected"
+                                : ""
+                            }
+                          >
+                            <span aria-hidden="true">★</span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </article>
                 );

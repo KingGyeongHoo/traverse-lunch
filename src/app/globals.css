@@ -14,7 +14,165 @@
   flex: 0 0 auto;
   min-height: 48px;
 }
+.nearby-form {
+  display: grid;
+  grid-template-columns: 1fr 200px;
+  gap: 24px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.nearby-options {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.nearby-options legend,
+.nearby-distance span {
+  margin-bottom: 8px;
+  font-weight: 750;
+  font-size: 14px;
+}
+.nearby-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.nearby-choice label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 100px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.nearby-choice label.selected {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: var(--tint);
+}
+.nearby-choice input {
+  accent-color: var(--primary);
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+.nearby-choice label:has(input:focus-visible) {
+  outline: 3px solid var(--secondary);
+  outline-offset: 3px;
+}
+.nearby-distance {
+  display: flex;
+  flex-direction: column;
+}
+.nearby-distance input {
+  min-height: 48px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--foreground);
+  font-size: 16px;
+}
+.nearby-food {
+  grid-column: 1 / -1;
+}
+.nearby-submit {
+  min-height: 48px;
+  min-width: 160px;
+  justify-self: start;
+}
+.nearby-error {
+  margin-top: 16px;
+}
+.nearby-results {
+  padding-top: 36px;
+}
+.nearby-results .empty-state,
+.nearby-list {
+  margin-top: 20px;
+}
+.nearby-help {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.nearby-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.nearby-card {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.nearby-card-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.nearby-card-meta strong {
+  white-space: nowrap;
+  color: var(--primary);
+}
+.nearby-card h3 {
+  margin: 8px 0;
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+.nearby-card p {
+  color: var(--muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.nearby-card a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 44px;
+  margin-top: 8px;
+  color: var(--primary);
+  font-weight: 750;
+}
+@media (max-width: 760px) {
+  .nearby-form {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 20px;
+  }
+  .nearby-food {
+    grid-column: auto;
+  }
+  .nearby-submit {
+    width: 100%;
+  }
+  .nearby-list {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
 @media (max-width: 460px) {
+  .nearby-choice {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .nearby-food .nearby-choice {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .nearby-choice label {
+    justify-content: center;
+    padding: 8px 4px;
+    font-size: 13px;
+  }
   .address-entry input {
     flex-basis: 100%;
   }
@@ -571,6 +729,48 @@ h1 {
   padding: 20px 0;
   margin-top: auto;
 }
+.preference-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 0 0 20px;
+  font-size: 12px;
+  font-weight: 750;
+  color: var(--foreground);
+  position: relative;
+  z-index: 2;
+}
+.rating-average {
+  margin-top: 4px;
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 750;
+}
+.rating-average span {
+  color: var(--primary);
+}
+.rating-stars {
+  display: flex;
+}
+.rating-stars button {
+  display: grid;
+  place-items: center;
+  flex: 1 1 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--line);
+  font-size: 24px;
+}
+.rating-stars button.selected {
+  color: var(--primary);
+}
+.rating-stars button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -1046,7 +1246,7 @@ h1 {
     font-size: 16px;
   }
   .restaurant-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     gap: 8px;
   }
   .restaurant-card {
@@ -1258,12 +1458,14 @@ h1 {
   }
   .site-nav {
     width: 100%;
-    gap: 8px;
+    gap: 4px;
   }
   .site-nav a {
     text-align: center;
     flex: 1;
-    padding: 10px 12px;
+    padding: 10px 5px;
+    font-size: 12px;
+    white-space: nowrap;
   }
   h1 {
     font-size: 38px;

@@ -3,7 +3,7 @@ import Link from "next/link";
 export default function SiteHeader({
   current,
 }: {
-  current?: "restaurants" | "menus";
+  current?: "restaurants" | "menus" | "nearby";
 }) {
   return (
     <header className="header">
@@ -28,6 +28,12 @@ export default function SiteHeader({
           aria-current={current === "menus" ? "page" : undefined}
         >
           메뉴 고르기
+        </Link>
+        <Link
+          href="/nearby"
+          aria-current={current === "nearby" ? "page" : undefined}
+        >
+          주변 찾기
         </Link>
       </nav>
     </header>

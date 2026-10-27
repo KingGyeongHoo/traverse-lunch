@@ -11,8 +11,10 @@ import {
   openCompany,
   loadSnapshot,
   changeTeam,
+  rpc,
   type Action,
 } from "./supabase";
+import { localRaterId, parseRatings, type Ratings } from "./ratings";
 
 async function request<T>(
   url: string,
@@ -46,6 +48,44 @@ async function mutate(action: Action, payload: Record<string, unknown>) {
 }
 
 export const lunchClient = {
+  async ratings(): Promise<Ratings> {
+    if (configured)
+      return parseRatings(
+        await rpc("lunch_rating_snapshot", { p_team: await companyId() }),
+      );
+    const response = await fetch("/api/ratings", {
+      headers: { "x-lunch-rater": localRaterId() },
+      cache: "no-store",
+      signal: AbortSignal.timeout(12000),
+    });
+    const data = await response.json();
+    if (!response.ok)
+      throw new Error(data.error || "별점 정보를 불러오지 못했어요.");
+    return parseRatings(data);
+  },
+  async setRating(restaurantId: string, score: number): Promise<Ratings> {
+    if (configured)
+      return parseRatings(
+        await rpc("lunch_set_rating", {
+          p_team: await companyId(),
+          p_restaurant: restaurantId,
+          p_score: score,
+        }),
+      );
+    const response = await fetch("/api/ratings", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "x-lunch-rater": localRaterId(),
+      },
+      body: JSON.stringify({ restaurantId, score }),
+      signal: AbortSignal.timeout(12000),
+    });
+    const data = await response.json();
+    if (!response.ok)
+      throw new Error(data.error || "별점을 저장하지 못했어요.");
+    return parseRatings(data);
+  },
   resolveAddress(address: string): Promise<RestaurantLocation> {
     return request("/api/address", "POST", { address });
   },
